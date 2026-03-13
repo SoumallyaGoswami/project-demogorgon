@@ -1,20 +1,13 @@
 const gameState = {
-  // Map of playerId -> player object
   players: {},
-
-  // Map of playerId -> role string (if you want fast lookup)
   roles: {},
+  status: "lobby",
 
-  // "lobby" | "dispersal" | "active"
-  status: 'lobby',
-
-  // Simple arena definition; adjust as needed
   arena: {
     center: { x: 0, y: 0 },
     radius: 100,
   },
 
-  // Game timer value (e.g. seconds)
   timer: 0,
 };
 
@@ -26,7 +19,7 @@ function addPlayer(player) {
 
   const fullPlayer = {
     id,
-    name: player.name ?? existing.name ?? 'Unknown',
+    name: player.name ?? existing.name ?? "Unknown",
     role: player.role ?? existing.role ?? null,
     position: {
       x: player.position?.x ?? existing.position?.x ?? 0,
@@ -54,10 +47,17 @@ function getPlayers() {
   return Object.values(gameState.players);
 }
 
+function setPlayerRole(playerId, role) {
+  if (!playerId || !gameState.players[playerId]) return;
+
+  gameState.players[playerId].role = role;
+  gameState.roles[playerId] = role;
+}
+
 module.exports = {
   gameState,
   addPlayer,
   removePlayer,
   getPlayers,
+  setPlayerRole,
 };
-

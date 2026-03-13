@@ -7,6 +7,7 @@ const PORT = 3001;
 
 const app = express();
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: {
     origin: '*',
@@ -14,7 +15,7 @@ const io = new Server(server, {
   },
 });
 
-// Register all socket event handlers
+// Register all socket events
 socketHandler(io);
 
 app.get('/', (req, res) => {
