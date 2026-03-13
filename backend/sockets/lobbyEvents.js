@@ -5,6 +5,7 @@ const {
   updatePlayerPosition,
 } = require('../game/gameState');
 const { assignRoles } = require('../game/roles');
+const { getRadarTargets } = require('../game/radarDetection');
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -63,9 +64,14 @@ function registerLobbyEvents(socket, io) {
       position: p.position,
     }));
     io.emit('playerPositions', players);
+
+    const currentPlayer = players.find((p) => p.id === socket.id);
+    if (currentPlayer) {
+      const targets = getRadarTargets(currentPlayer, players);
+      socket.emit('radarTargets', targets);
+    }
   });
 }
 module.exports = {
   registerLobbyEvents,
 };
-
