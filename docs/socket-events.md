@@ -1,0 +1,9 @@
+joinLobby
+startGame
+assignRoles
+updatePosition
+warningTrigger
+playerCaptured
+sheriffShoot
+activateStealth
+activateInvisibility
