@@ -17,6 +17,47 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+/*
+WIN CONDITION CHECK
+*/
+function checkWinCondition(io) {
+
+  const players = getPlayers();
+
+  const demogorgon = players.find(p => p.role === "demogorgon");
+
+  const humansAlive = players.filter(
+    p => p.role !== "demogorgon" && p.alive !== false
+  );
+
+  // Humans win if demogorgon dies
+  if (!demogorgon || demogorgon.alive === false) {
+
+    io.emit("gameOver", {
+      winner: "humans"
+    });
+
+    return true;
+  }
+
+  // Demogorgon wins if all humans die
+  if (humansAlive.length === 0) {
+
+    io.emit("gameOver", {
+      winner: "demogorgon"
+    });
+
+    return true;
+  }
+
+  return false;
+}
+
+let gameTimer = null;
+
+/*
+MAIN SOCKET REGISTRATION
+*/
 function registerLobbyEvents(socket, io) {
 
   /*
@@ -28,11 +69,9 @@ function registerLobbyEvents(socket, io) {
       return;
     }
 
-    const trimmedName = data.name.trim();
-
     const player = {
       id: socket.id,
-      name: trimmedName,
+      name: data.name.trim(),
     };
 
     addPlayer(player);
@@ -48,22 +87,49 @@ function registerLobbyEvents(socket, io) {
 
     const players = getPlayers();
 
-    if (!players || players.length === 0) {
-      return;
-    }
+    if (!players.length) return;
 
     assignRoles(players);
 
-    console.log('Game starting...');
-    console.log('Roles assigned:', players);
+    console.log("Game starting...");
+    console.log("Roles assigned:", players);
 
-    players.forEach((player) => {
-      io.to(player.id).emit('roleAssigned', {
-        role: player.role,
+    // 20 second timer (for testing)
+    if (gameTimer) clearTimeout(gameTimer);
+
+    gameTimer = setTimeout(() => {
+
+      console.log("TIME UP - HUMANS WIN");
+
+      io.emit("gameOver", {
+        winner: "humans",
+        reason: "time"
       });
+
+    }, 20000);
+
+    players.forEach(player => {
+
+      io.to(player.id).emit('roleAssigned', {
+        role: player.role
+      });
+
     });
 
     io.emit('gameStarted');
+
+  });
+
+  /*
+  TIME UP EVENT (from frontend timer)
+  */
+  socket.on("timeUp", () => {
+
+    console.log("Timer ended - Humans win");
+
+    io.emit("gameOver", {
+      winner: "humans"
+    });
 
   });
 
@@ -75,38 +141,33 @@ function registerLobbyEvents(socket, io) {
     if (
       !data ||
       typeof data.x !== 'number' ||
-      typeof data.y !== 'number' ||
-      Number.isNaN(data.x) ||
-      Number.isNaN(data.y)
-    ) {
-      return;
-    }
+      typeof data.y !== 'number'
+    ) return;
 
     const clampedX = clamp(data.x, -50, 50);
     const clampedY = clamp(data.y, -50, 50);
 
     updatePlayerPosition(socket.id, {
       x: clampedX,
-      y: clampedY,
+      y: clampedY
     });
 
-    const players = getPlayers().map((p) => ({
+    const players = getPlayers().map(p => ({
       id: p.id,
       name: p.name,
       role: p.role,
       position: p.position || { x: 0, y: 0 },
-      alive: p.alive !== false,
+      alive: p.alive !== false
     }));
 
-    // Broadcast updated positions
     io.emit('playerPositions', players);
 
-    const currentPlayer = players.find((p) => p.id === socket.id);
+    const currentPlayer = players.find(p => p.id === socket.id);
 
     if (!currentPlayer) return;
 
     /*
-    DEMOGORGON CAPTURE SYSTEM
+    DEMOGORGON CAPTURE
     */
     const capturedPlayers = detectCaptures(currentPlayer, players);
 
@@ -118,21 +179,22 @@ function registerLobbyEvents(socket, io) {
 
       io.emit('playerCaptured', {
         id: victim.id,
-        name: victim.name,
+        name: victim.name
       });
 
+      checkWinCondition(io);
     }
 
     /*
-    RADAR DETECTION SYSTEM
+    RADAR DETECTION
     */
     const alivePlayers = getPlayers()
-      .filter((p) => p.alive !== false)
-      .map((p) => ({
+      .filter(p => p.alive !== false)
+      .map(p => ({
         id: p.id,
         name: p.name,
         role: p.role,
-        position: p.position || { x: 0, y: 0 },
+        position: p.position || { x: 0, y: 0 }
       }));
 
     const detectedPlayers = detectNearbyPlayers(currentPlayer, alivePlayers);
@@ -142,46 +204,41 @@ function registerLobbyEvents(socket, io) {
   });
 
   /*
-  SHERIFF GUN SYSTEM
+  SHERIFF SHOOT
   */
   socket.on('sheriffShoot', () => {
 
     const players = getPlayers();
 
-    const currentPlayer = players.find((p) => p.id === socket.id);
+    const currentPlayer = players.find(p => p.id === socket.id);
 
     if (!currentPlayer) return;
-
-    // Only sheriff can shoot
     if (currentPlayer.role !== "sheriff") return;
-
-    // Sheriff must be alive
     if (currentPlayer.alive === false) return;
 
     const result = performSheriffShot(currentPlayer, players);
 
     if (!result) return;
 
-    // Consume sheriff bullet
     consumeSheriffBullet(currentPlayer.id);
 
-    // Kill victim
     setPlayerCaptured(result.victim.id);
 
     io.to(result.victim.id).emit('captured');
 
-    // Broadcast kill notification
     io.emit('playerCaptured', {
       id: result.victim.id,
-      name: result.victim.name,
+      name: result.victim.name
     });
 
     console.log(`Sheriff shot ${result.victim.name}`);
 
+    checkWinCondition(io);
+
   });
 
   /*
-  DISCONNECT HANDLING
+  DISCONNECT
   */
   socket.on('disconnect', () => {
 
