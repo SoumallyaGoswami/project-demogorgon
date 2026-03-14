@@ -33,6 +33,9 @@ function addPlayer(player) {
 
     alive: player.alive ?? existing.alive ?? true,
     invisible: player.invisible ?? existing.invisible ?? false,
+
+    // sheriff system
+    hasBullet: player.hasBullet ?? existing.hasBullet ?? true,
   };
 
   gameState.players[id] = fullPlayer;
@@ -118,6 +121,17 @@ function setPlayerCaptured(playerId) {
 }
 
 /*
+SHERIFF BULLET CONSUME
+*/
+function consumeSheriffBullet(playerId) {
+
+  if (!playerId || !gameState.players[playerId]) return;
+
+  gameState.players[playerId].hasBullet = false;
+
+}
+
+/*
 EXPORTS
 */
 module.exports = {
@@ -129,4 +143,5 @@ module.exports = {
   setPlayerRole,
   updatePlayerPosition,
   setPlayerCaptured,
+  consumeSheriffBullet,
 };
