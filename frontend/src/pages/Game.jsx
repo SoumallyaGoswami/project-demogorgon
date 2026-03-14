@@ -3,74 +3,65 @@ import socket from "../hooks/useSocket";
 import Radar from "../components/Radar";
 
 const Game = () => {
-  const [players, setPlayers] = useState([]);
+
   const [radarTargets, setRadarTargets] = useState([]);
   const [myPos, setMyPos] = useState({ x: 0, y: 0 });
 
+  // Listen for detected players
   useEffect(() => {
 
-    const handlePlayers = (data) => {
-      setPlayers(data);
+    const handleDetectedPlayers = (players) => {
+      setRadarTargets(players);
     };
 
-    const handleRadar = (targets) => {
-      setRadarTargets(targets);
-    };
-
-    socket.on("playerPositions", handlePlayers);
-    socket.on("radarTargets", handleRadar);
+    socket.on("detectedPlayers", handleDetectedPlayers);
 
     return () => {
-      socket.off("playerPositions", handlePlayers);
-      socket.off("radarTargets", handleRadar);
+      socket.off("detectedPlayers", handleDetectedPlayers);
     };
 
   }, []);
 
+  // Simulated movement
   useEffect(() => {
 
     const moveInterval = setInterval(() => {
 
-      setMyPos((prev) => {
+      const nextX = Math.floor(Math.random() * 101) - 50;
+      const nextY = Math.floor(Math.random() * 101) - 50;
 
-        let nextX = prev.x + (Math.random() * 4 - 2);
-        let nextY = prev.y + (Math.random() * 4 - 2);
+      setMyPos({ x: nextX, y: nextY });
 
-        nextX = Math.max(-50, Math.min(50, nextX));
-        nextY = Math.max(-50, Math.min(50, nextY));
-
-        const newPos = {
-          x: Math.round(nextX),
-          y: Math.round(nextY)
-        };
-
-        socket.emit("updatePosition", newPos);
-
-        return newPos;
-
+      socket.emit("updatePosition", {
+        x: nextX,
+        y: nextY
       });
 
-    }, 500);
+    }, 1000);
 
     return () => clearInterval(moveInterval);
 
   }, []);
 
   return (
-    <div className="min-h-screen bg-black text-[#ff4d4d] font-mono relative overflow-hidden flex items-center justify-center p-4">
+    <div className="min-h-screen bg-black text-[#ff4d4d] font-mono relative overflow-hidden flex items-center justify-center p-4 md:p-8">
 
-      <div className="absolute inset-0 pointer-events-none z-50 opacity-[0.05]"
+      {/* CRT Overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none z-50 opacity-[0.05]"
         style={{
           background:
             "linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.25) 50%), linear-gradient(90deg, rgba(255,0,0,0.06), rgba(0,255,0,0.02), rgba(0,0,255,0.06))",
           backgroundSize: "100% 3px, 3px 100%"
         }}
-      ></div>
+      />
 
       <div className="relative z-10 w-full max-w-6xl aspect-video border-4 border-[#ff4d4d]/30 bg-[#0a0a0a] shadow-[0_0_50px_rgba(255,0,0,0.1)] flex flex-col">
 
+        {/* Header */}
         <div className="border-b-2 border-[#ff4d4d]/30 px-6 py-3 flex justify-between items-center bg-[#111]">
-          <div className="flex flex-col">
+
+          <div>
             <h1 className="text-2xl font-black tracking-[0.3em] italic uppercase">
               Radar_Tracking_System
             </h1>
@@ -79,7 +70,7 @@ const Game = () => {
             </span>
           </div>
 
-          <div className="text-right flex flex-col">
+          <div className="text-right">
             <span className="text-xs animate-pulse font-bold uppercase">
               System_Status: Active_Hunt
             </span>
@@ -87,20 +78,26 @@ const Game = () => {
               Gate_Status: Sealed
             </span>
           </div>
+
         </div>
 
-        <div className="flex-grow flex p-6 gap-6 overflow-hidden bg-black">
+        <div className="flex-grow flex p-4 md:p-6 gap-6 overflow-hidden bg-black">
 
-          <div className="flex-grow relative flex items-center justify-center border border-[#ff4d4d]/20 bg-[#050505]">
-            <div className="w-[85%] aspect-square">
+          {/* Radar */}
+          <div className="flex-grow flex items-center justify-center border border-[#ff4d4d]/20 bg-[#050505]">
+
+            <div className="w-[90%] md:w-[85%] aspect-square">
               <Radar targets={radarTargets} />
             </div>
+
           </div>
 
-          <div className="w-80 flex flex-col gap-4">
+          {/* Sidebar */}
+          <div className="hidden md:flex w-80 flex-col gap-4">
 
-            <div className="border border-[#ff4d4d]/40 bg-black/40 p-4 relative">
-              <div className="absolute top-0 left-0 w-full h-[1px] bg-[#ff4d4d]/60"></div>
+            {/* Position */}
+            <div className="border border-[#ff4d4d]/40 bg-black/40 p-4">
+
               <p className="text-[10px] uppercase tracking-widest opacity-50 mb-2">
                 Subject Coordinates
               </p>
@@ -109,60 +106,90 @@ const Game = () => {
                 <span>X: {myPos.x}</span>
                 <span>Y: {myPos.y}</span>
               </div>
+
             </div>
 
-            <div className="flex-grow border border-[#ff4d4d]/20 bg-black/40 p-4 overflow-hidden flex flex-col">
+            {/* Detected Players */}
+            <div className="flex-grow border border-[#ff4d4d]/20 bg-black/40 p-4 flex flex-col">
 
               <p className="text-[10px] uppercase tracking-widest opacity-50 mb-4 pb-2 border-b border-[#ff4d4d]/10">
-                Active Signals
+                Detected Signals
               </p>
 
               <div className="flex-grow overflow-y-auto space-y-2 pr-2 custom-scrollbar">
 
-                {players.map((player) => (
+                {radarTargets.map((target) => (
+
                   <div
-                    key={player.id}
-                    className="flex items-center justify-between text-[10px] border-l-2 border-[#ff4d4d]/40 pl-3 py-1 hover:bg-[#ff4d4d]/5 transition-colors"
+                    key={target.id}
+                    className="flex items-center justify-between text-[10px] border-l-2 border-[#ff4d4d]/40 pl-3 py-1 hover:bg-[#ff4d4d]/5"
                   >
-                    <span className="uppercase tracking-widest truncate max-w-[120px]">
-                      {player.name}
+
+                    <div>
+                      <span className="uppercase tracking-widest font-bold">
+                        {target.name}
+                      </span>
+
+                      <div className="opacity-50 text-[8px]">
+                        DIST: {target.distance?.toFixed(1)}M
+                      </div>
+
+                    </div>
+
+                    <span className="opacity-70 italic uppercase text-[8px]">
+                      {target.role}
                     </span>
-                    <span className="opacity-50 italic">STABLE</span>
+
                   </div>
+
                 ))}
+
+                {radarTargets.length === 0 && (
+                  <div className="h-20 flex items-center justify-center opacity-20 italic text-xs uppercase tracking-widest">
+                    Scanning Sector...
+                  </div>
+                )}
 
               </div>
 
             </div>
 
+            {/* Threat */}
             <div className="border-2 border-red-600/50 bg-red-950/10 p-4 text-center">
+
               <p className="text-[10px] uppercase tracking-widest text-red-500 mb-1">
                 Threat Assessment
               </p>
+
               <p className="text-xl font-black text-red-600 animate-pulse tracking-widest italic">
                 CRITICAL_OMEGA
               </p>
+
             </div>
 
           </div>
 
         </div>
 
+        {/* Footer */}
         <div className="h-10 border-t-2 border-[#ff4d4d]/30 flex items-center px-6 justify-between bg-[#111] text-[8px] uppercase tracking-[0.4em] opacity-50">
+
           <span>Memory_Check: OK</span>
           <span>Data_Link: Encrypted</span>
           <span>© 1984 Hawkins National Lab</span>
+
         </div>
 
       </div>
 
-      <style>
-        {`
-          .custom-scrollbar::-webkit-scrollbar { width:2px; }
-          .custom-scrollbar::-webkit-scrollbar-track { background:rgba(255,77,77,0.05); }
-          .custom-scrollbar::-webkit-scrollbar-thumb { background:rgba(255,77,77,0.3); }
-        `}
-      </style>
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 77, 77, 0.3);
+        }
+      `}</style>
 
     </div>
   );
