@@ -4,10 +4,12 @@ const {
   addPlayer,
   getPlayers,
   updatePlayerPosition,
+  setPlayerCaptured,
 } = require('../game/gameState');
 
 const { assignRoles } = require('../game/roles');
 const { detectNearbyPlayers } = require('../game/detectionSystem');
+const { detectCaptures } = require('../game/captureSystem');
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -82,6 +84,7 @@ function registerLobbyEvents(socket, io) {
       name: p.name,
       role: p.role,
       position: p.position || { x: 0, y: 0 },
+      alive: p.alive !== false,
     }));
 
     // Broadcast updated positions
@@ -90,11 +93,28 @@ function registerLobbyEvents(socket, io) {
     const currentPlayer = players.find((p) => p.id === socket.id);
 
     if (currentPlayer) {
+      const capturedPlayers = detectCaptures(currentPlayer, players);
 
-      const detectedPlayers = detectNearbyPlayers(currentPlayer, players);
+      for (const victim of capturedPlayers) {
+        setPlayerCaptured(victim.id);
+        io.to(victim.id).emit('captured');
+        io.emit('playerCaptured', {
+          id: victim.id,
+          name: victim.name,
+        });
+      }
+
+      const alivePlayers = getPlayers()
+        .filter((p) => p.alive !== false)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          role: p.role,
+          position: p.position || { x: 0, y: 0 },
+        }));
+      const detectedPlayers = detectNearbyPlayers(currentPlayer, alivePlayers);
 
       socket.emit('detectedPlayers', detectedPlayers);
-
     }
 
   });
